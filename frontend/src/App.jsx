@@ -1,5 +1,5 @@
 // หน้าหลักของ feature UC-07: เลือกช่าง แล้วยืนยัน แล้วดูผล
-// ตัวอย่างใช้ลูกค้าและที่อยู่คงที่ (การเข้าสู่ระบบ UC-10 และเลือกที่อยู่ UC-02 อยู่นอกขอบเขต feature นี้)
+// ตัวอย่างใช้ลูกค้าและที่อยู่คงที่ (การเข้าสู่ระบบ UC-10 อยู่นอกขอบเขต feature นี้ ส่วนการเลือกที่อยู่ให้บริการยังรอ Q-29)
 import { useState } from 'react'
 import { api as realApi } from './api/client.js'
 import TechnicianPicker from './pages/TechnicianPicker.jsx'
@@ -20,11 +20,12 @@ export default function App({ api = realApi, customerId = 1, addressId = 1 }) {
         <TechnicianPicker api={api} customerId={customerId} addressId={addressId} onHeld={setHeld} />
       )}
       {held && !job && (
-        <ConfirmBooking api={api} customerId={customerId} addressId={addressId} held={held}
+        <ConfirmBooking key={held.slot.slot_id} api={api} customerId={customerId} addressId={addressId} held={held}
           onConfirmed={setJob}
-          onPickAlternative={(a) => setHeld({ ...held, slot: a, technician: { technician_id: a.technician_id, name: a.technician_name } })} />
+          onBack={() => setHeld(null)}
+          onPickAlternative={(a) => setHeld({ ...held, slot: a, holdExpiresAt: null, technician: { technician_id: a.technician_id, name: a.technician_name } })} />
       )}
-      {job && <BookingResult job={job} onRestart={() => { setHeld(null); setJob(null) }} />}
+      {job && <BookingResult job={job} technicianName={held?.technician?.name} onRestart={() => { setHeld(null); setJob(null) }} />}
     </main>
   )
 }

@@ -34,9 +34,16 @@ def hold_slot(db, slot: TimeSlot, customer_id: int, now: datetime) -> TimeSlot:
     return slot
 
 
+class UnknownCategory(Exception):
+    """ประเภทงานที่ไม่อยู่ในตารางราคาประเมิน (AS-10) ไม่มียอดมัดจำ จึงจองไม่ได้"""
+
+
 def deposit_for(category: str) -> int:
-    """ยอดมัดจำ ปัดขึ้นหลักสิบ (REQ-BR-002 Computation) ตัวเลขตั้งต้นต่อประเภทงานมาจาก data dictionary"""
-    base = {"ประปา": 350, "ไฟฟ้า": 400, "แอร์": 500}.get(category, 300)
+    """REQ-BR-002: ยอดมัดจำจากตารางราคาประเมิน (config.DEPOSIT_BY_CATEGORY) ปัดขึ้นหลักสิบ
+    ประเภทงานที่ไม่อยู่ในตาราง ไม่เดายอดให้ (CR-03 ตัดค่า 300 ที่ไม่มีที่มาออก ดู F-02)"""
+    if category not in config.DEPOSIT_BY_CATEGORY:
+        raise UnknownCategory(category)
+    base = config.DEPOSIT_BY_CATEGORY[category]
     return -(-base // 10) * 10
 
 

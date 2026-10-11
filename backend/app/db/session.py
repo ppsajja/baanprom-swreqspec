@@ -1,4 +1,6 @@
-"""สร้าง engine และ session ของ SQLAlchemy (ทีมเลือกเอง ไม่ได้มาจาก spec)"""
+"""สร้าง engine และ session ของ SQLAlchemy (ทีมเลือกเอง ดู D-00-02 ในไฟล์กลาง)"""
+import threading
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from sqlalchemy.pool import StaticPool
@@ -23,9 +25,19 @@ engine = make_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+# GAP-15: SQLite ใช้ connection เดียวร่วมกันทุกเธรด (StaticPool) ถ้าหลายคำขอเข้าพร้อมกันจะชนกันบน Python 3.12 ขึ้นไป
+# จึงให้คำขอที่ใช้ SQLite เข้าฐานข้อมูลทีละคำขอ ส่วนระบบจริงใช้ PostgreSQL (D-00-02) ไม่ผ่านเงื่อนไขนี้
+_sqlite_gate = threading.Lock()
+
+
 def get_db():
     db = SessionLocal()
+    one_at_a_time = db.get_bind().dialect.name == "sqlite"
+    if one_at_a_time:
+        _sqlite_gate.acquire()
     try:
         yield db
     finally:
         db.close()
+        if one_at_a_time:
+            _sqlite_gate.release()

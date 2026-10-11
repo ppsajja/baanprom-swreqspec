@@ -13,13 +13,18 @@ export const api = {
     const q = new URLSearchParams({ category, address_id: addressId, customer_id: customerId })
     return readJson(await fetch(`${BASE}/technicians?${q}`))
   },
-  // REQ-FN-041 ล็อกช่วงเวลา 10 นาที
+  // REQ-FN-041 ล็อกช่วงเวลาชั่วคราว (ระยะล็อกอยู่ที่หลังบ้าน config HOLD_MINUTES หน้าจอรับเวลาสิ้นสุดจากคำตอบ)
   async holdSlot({ slotId, customerId }) {
     return readJson(await fetch(`${BASE}/slots/${slotId}/hold`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customer_id: customerId }),
     }))
+  },
+  // REQ-BR-002 ยอดมัดจำตามประเภทงาน (AC-07-11) หน้าจอห้ามคำนวณหรือพิมพ์ยอดเอง
+  async getDepositQuote({ category }) {
+    const q = new URLSearchParams({ category })
+    return readJson(await fetch(`${BASE}/deposit-quote?${q}`))
   },
   // UC-07 ขั้น 5 ยืนยันและชำระมัดจำ ตอบ 201 / 409 slot_taken / 402 payment_failed
   async createBooking({ customerId, slotId, addressId, category }) {

@@ -1,4 +1,4 @@
-"""POST /slots/{id}/hold, POST /bookings, GET /jobs/{id}, GET /jobs/{id}/technician-view (plan.md ข้อ 4)"""
+"""POST /slots/{id}/hold, GET /deposit-quote, POST /bookings, GET /jobs/{id}, GET /jobs/{id}/technician-view (plan.md ข้อ 4)"""
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -47,12 +47,26 @@ def hold(slot_id: int, body: HoldIn, db: Session = Depends(get_db), now: datetim
     return {"slot_id": slot.id, "hold_expires_at": slot.hold_expires_at.isoformat()}
 
 
+@router.get("/deposit-quote")
+def deposit_quote(category: str):
+    # รองรับ REQ-BR-002 (AC-07-11): ยอดที่หน้าจอแสดงก่อนยืนยัน มาจากฟังก์ชันเดียวกับที่ใช้ตัดมัดจำ
+    try:
+        amount = service.deposit_for(category)
+    except service.UnknownCategory:
+        raise HTTPException(422, "ไม่รู้จักประเภทงาน")
+    return {"category": category, "deposit_amount": amount}
+
+
 @router.post("/bookings", status_code=201)
 def create(body: BookingIn, db: Session = Depends(get_db), now: datetime = Depends(get_now)):
     # รองรับ REQ-FN-008, REQ-IF-001, REQ-IF-005
     customer, slot, address = db.get(Customer, body.customer_id), db.get(TimeSlot, body.slot_id), db.get(ServiceAddress, body.address_id)
     if not (customer and slot and address):
         raise HTTPException(404, "ไม่พบลูกค้า ช่วงเวลา หรือที่อยู่")
+    try:
+        service.deposit_for(body.category)  # REQ-BR-002: ประเภทงานต้องอยู่ในตารางราคาประเมิน (AS-10)
+    except service.UnknownCategory:
+        raise HTTPException(422, "ไม่รู้จักประเภทงาน")
     try:
         job = service.create_booking(db, customer, slot, address, body.category, get_gateway(), now)
     except service.SlotTaken as e:

@@ -2,10 +2,14 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import ConfirmBooking from '../pages/ConfirmBooking.jsx'
 
+// CR-03 (GAP-16): หน้ายืนยันรับยอดมัดจำและเวลาสิ้นสุดการล็อกมากับ held จึงเพิ่มสองค่านี้ในส่วน Given
+// แก้เฉพาะข้อมูลตั้งต้น ไม่ได้แก้ assert ของ AC-07-04 แม้แต่บรรทัดเดียว
 const held = {
   category: 'ประปา',
   technician: { technician_id: 1, name: 'ประสิทธิ์' },
   slot: { slot_id: 1, start: '2026-10-05T14:00:00', end: '2026-10-05T16:00:00' },
+  depositAmount: 350,
+  holdExpiresAt: '2026-10-04T10:10:00',
 }
 
 test('AC-07-04 แสดง "ช่วงเวลาถูกจองแล้ว" และปุ่มช่วงใกล้เคียงอย่างน้อย 2 ปุ่ม โดยไม่ตัดเงิน', async () => {

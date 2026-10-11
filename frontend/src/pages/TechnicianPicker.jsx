@@ -1,5 +1,7 @@
-// หน้าเลือกช่าง (UC-07 ขั้น 1 ถึง 3) รองรับ REQ-FN-008 และ REQ-FN-041
+// หน้าเลือกช่าง (UC-07 ขั้น 1 ถึง 3) รองรับ REQ-FN-008 และ REQ-FN-041 ตามแบบ UI-07-01 (CR-03)
+// ที่อยู่ให้บริการ: ยังรอ Q-29 จึงใช้ที่อยู่หลักที่ส่งเข้ามา (addressId) และยังไม่แสดงบนหน้าจอ
 import { useState } from 'react'
+import Steps from '../components/Steps.jsx'
 
 const CATEGORIES = ['ประปา', 'ไฟฟ้า', 'แอร์']
 
@@ -21,28 +23,39 @@ export default function TechnicianPicker({ api, customerId, addressId, onHeld })
   }
 
   async function pick(tech, slot) {
-    const { status, body } = await api.holdSlot({ slotId: slot.slot_id, customerId })
-    if (status === 409) return setError('ช่วงเวลานี้เพิ่งถูกจองไป กรุณาเลือกใหม่')
-    onHeld({ slot, technician: tech, category, holdExpiresAt: body.hold_expires_at })
+    // REQ-FN-041: เลือกช่วงเวลาแล้วล็อกทันที ถ้าคนอื่นล็อกไปก่อน (BR-02) ให้แจ้งและเลือกใหม่
+    const hold = await api.holdSlot({ slotId: slot.slot_id, customerId })
+    if (hold.status === 409) return setError('ช่วงเวลานี้เพิ่งถูกจองไป')
+    // REQ-BR-002: ขอยอดมัดจำจากระบบ ไม่คำนวณหรือพิมพ์ยอดเองในหน้าจอ (D-00-05)
+    const quote = await api.getDepositQuote({ category })
+    if (quote.status !== 200) return setError('ยังแสดงยอดมัดจำไม่ได้ กรุณาลองใหม่')
+    onHeld({ slot, technician: tech, category, holdExpiresAt: hold.body.hold_expires_at, depositAmount: quote.body.deposit_amount })
   }
 
   return (
     <section className="rounded-xl bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-800">1. เลือกประเภทงานและช่างที่ว่าง</h2>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <Steps current={1} />
+      <h2 className="text-lg font-semibold text-slate-800">เลือกประเภทงานและช่างที่ว่าง</h2>
+      <p className="mt-3 text-sm text-slate-500">ประเภทงาน</p>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
         {CATEGORIES.map((c) => (
-          <button key={c} type="button" onClick={() => setCategory(c)}
+          <button key={c} type="button" onClick={() => setCategory(c)} aria-pressed={category === c}
             className={`rounded-full border px-4 py-1 text-sm ${category === c ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
             {c}
           </button>
         ))}
-        <button type="button" onClick={search} className="ml-auto rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600">
-          ค้นหาช่างที่ว่างใน 7 วัน
-        </button>
       </div>
-      {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      <button type="button" onClick={search} className="mt-4 w-full rounded-lg bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600">
+        ค้นหาช่างที่ว่างใน 7 วัน
+      </button>
+      {error && (
+        <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          <p className="font-semibold">{error}</p>
+          {error === 'ช่วงเวลานี้เพิ่งถูกจองไป' && <p>กรุณาเลือกช่วงเวลาใหม่</p>}
+        </div>
+      )}
       {technicians && technicians.length === 0 && (
-        <p className="mt-3 text-sm text-slate-600">ไม่มีช่างว่างใน 7 วันข้างหน้า (A1: ลองช่วงถัดไป หรือเข้า waitlist)</p>
+        <p className="mt-3 text-sm text-slate-600">ยังไม่มีช่างว่างใน 7 วันข้างหน้า</p>
       )}
       <ul className="mt-4 space-y-3">
         {technicians?.map((t) => (
@@ -59,6 +72,9 @@ export default function TechnicianPicker({ api, customerId, addressId, onHeld })
           </li>
         ))}
       </ul>
+      {technicians && technicians.length > 0 && (
+        <p className="mt-3 text-sm text-slate-600">แตะช่วงเวลาเพื่อเลือก ระบบจะล็อกช่วงเวลานั้นไว้ให้ระหว่างที่คุณยืนยัน</p>
+      )}
     </section>
   )
 }
